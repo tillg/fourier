@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fourier, Zelle für Zelle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --paper:#eef1f3; --card:#f8fafb; --ink:#141a20; --ink-2:#3a4550; --muted:#5f6b78;
+    --line:#d7dde3; --grid:#e2e7ec; --rule:#c6ced6;
+    --accent:#1667b8;
+    --c2:#1667b8; --c5:#c8641c; --c9:#8a3ca0; --sum:#141a20;
+    --band:rgba(22,103,184,.10);
+    --shade:rgba(200,100,28,.16);
+    --good:#2f7d4f;
+    --shadow:0 1px 2px rgba(20,26,32,.05),0 6px 20px rgba(20,26,32,.06);
+    --maxw:1080px;
+  }
+  :root:not([data-theme="light"]){ }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#0f141a; --card:#151c24; --ink:#e8edf2; --ink-2:#b8c2cd; --muted:#8b97a4;
+      --line:#26303a; --grid:#20272f; --rule:#323d48;
+      --accent:#4f9fd8;
+      --c2:#4a97d4; --c5:#d98a44; --c9:#b374d4; --sum:#e8edf2;
+      --band:rgba(79,159,216,.14);
+      --shade:rgba(217,138,68,.20);
+      --good:#57b47f;
+      --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0f141a; --card:#151c24; --ink:#e8edf2; --ink-2:#b8c2cd; --muted:#8b97a4;
+    --line:#26303a; --grid:#20272f; --rule:#323d48;
+    --accent:#4f9fd8;
+    --c2:#4a97d4; --c5:#d98a44; --c9:#b374d4; --sum:#e8edf2;
+    --band:rgba(79,159,216,.14);
+    --shade:rgba(217,138,68,.20);
+    --good:#57b47f;
+    --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 26px rgba(0,0,0,.35);
+  }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font-family:"IBM Plex Serif",Georgia,serif; font-size:16px; line-height:1.62;
+    padding-block:0; padding-inline:0;
+  }
+  .wrap{max-width:var(--maxw); margin:0 auto; padding-inline:clamp(16px,4vw,40px);}
+
+  /* ---- masthead ---- */
+  header.mast{padding-block:48px 20px;}
+  .kicker{font-family:"IBM Plex Mono",monospace; font-size:12px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--muted); display:flex; gap:.7em; flex-wrap:wrap; align-items:center;}
+  .kicker .dot{width:5px;height:5px;border-radius:50%;background:var(--accent);display:inline-block}
+  h1{font-family:"IBM Plex Sans",system-ui,sans-serif; font-weight:700; letter-spacing:-.02em;
+    font-size:clamp(2.1rem,6vw,3.7rem); line-height:1.02; margin:.28em 0 .12em; text-wrap:balance;}
+  h1 .em{color:var(--accent)}
+  .dek{font-size:clamp(1.05rem,2.2vw,1.3rem); color:var(--ink-2); max-width:60ch; margin:.2em 0 0;}
+  .mast-meta{font-family:"IBM Plex Mono",monospace; font-size:12.5px; color:var(--muted);
+    margin-top:18px; display:flex; gap:1.4em; flex-wrap:wrap;}
+  .mast-meta code{color:var(--ink-2)}
+
+  .theme-toggle{position:fixed; top:14px; right:14px; z-index:20;
+    font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--ink-2);
+    background:var(--card); border:1px solid var(--line); border-radius:999px;
+    padding:7px 12px; cursor:pointer; box-shadow:var(--shadow);}
+  .theme-toggle:hover{border-color:var(--rule)}
+
+  /* ---- notebook cell ---- */
+  .cell{position:relative; margin:26px 0; padding:0 0 0 clamp(28px,5vw,64px);}
+  .cell::before{ /* the [n] execution marker */
+    content:attr(data-n); position:absolute; left:0; top:2px;
+    font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted);
+    width:clamp(24px,5vw,56px);
+  }
+  .cell::after{ /* the rail */
+    content:""; position:absolute; left:clamp(11px,2.4vw,26px); top:26px; bottom:-26px;
+    width:2px; background:var(--line);
+  }
+  .cell:last-of-type::after{display:none}
+  .cell h2{font-family:"IBM Plex Sans",sans-serif; font-weight:600; letter-spacing:-.01em;
+    font-size:clamp(1.35rem,3vw,1.9rem); line-height:1.12; margin:.1em 0 .35em; text-wrap:balance;}
+  .cell .lead{color:var(--ink-2); max-width:64ch; margin:.2em 0 1em;}
+  .cell p{max-width:64ch}
+  .out{font-family:"IBM Plex Mono",monospace; font-size:11.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--muted); margin:0 0 8px;}
+
+  figure{margin:0}
+  .panel{background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px 10px; box-shadow:var(--shadow);}
+  figcaption{font-size:14px; color:var(--muted); margin-top:9px; font-style:italic; max-width:70ch}
+  svg.chart{display:block; width:100%; height:auto}
+  svg .axis{stroke:var(--rule); stroke-width:1}
+  svg .grid{stroke:var(--grid); stroke-width:1}
+  svg .zero{stroke:var(--rule); stroke-width:1.4}
+  svg text{font-family:"IBM Plex Mono",monospace; fill:var(--muted)}
+  svg .cwave{fill:none; stroke-width:2.4; stroke-linejoin:round; stroke-linecap:round}
+  svg .lbl{font-size:15px; font-weight:500}
+
+  .formula{font-family:"IBM Plex Mono",monospace; font-size:clamp(13px,2.1vw,16px);
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; overflow-x:auto; color:var(--ink); box-shadow:var(--shadow); margin:2px 0 6px;}
+  .formula .c2{color:var(--c2);font-weight:600} .formula .c5{color:var(--c5);font-weight:600}
+  .formula .c9{color:var(--c9);font-weight:600}
+
+  .knobs{display:flex; gap:10px; flex-wrap:wrap; margin:10px 0 2px}
+  .knob{flex:1 1 150px; background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px}
+  .knob b{font-family:"IBM Plex Sans",sans-serif; font-size:13px; display:block; color:var(--ink)}
+  .knob span{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted)}
+
+  .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
+  @media(max-width:720px){.grid3{grid-template-columns:1fr}}
+
+  /* rhyme test controls */
+  .controls{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:12px 0 4px;
+    font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--ink-2)}
+  .controls input[type=range]{flex:1 1 220px; accent-color:var(--accent); min-width:180px}
+  .scorebox{display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end; margin:10px 0 2px}
+  .score{font-family:"IBM Plex Sans",sans-serif}
+  .score .big{font-size:clamp(2rem,7vw,3.2rem); font-weight:700; line-height:1; font-variant-numeric:tabular-nums}
+  .score small{display:block; font-family:"IBM Plex Mono",monospace; font-size:11px;
+    letter-spacing:.12em; text-transform:uppercase; color:var(--muted); margin-bottom:4px}
+  .verdict{font-family:"IBM Plex Mono",monospace; font-size:13px; padding:4px 10px; border-radius:999px;
+    border:1px solid var(--line); align-self:center}
+  .verdict.in{color:var(--good); border-color:var(--good)}
+  .verdict.out{color:var(--muted)}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+  .chip{font-family:"IBM Plex Mono",monospace; font-size:12px; padding:3px 9px; border-radius:999px;
+    border:1px solid var(--line); color:var(--ink-2); cursor:pointer; background:var(--card)}
+  .chip:hover{border-color:var(--accent); color:var(--accent)}
+
+  aside.note{border-left:3px solid var(--accent); background:var(--card); border-radius:0 10px 10px 0;
+    padding:12px 16px; margin:14px 0; max-width:66ch}
+  aside.note b{font-family:"IBM Plex Sans",sans-serif}
+
+  /* future / empty cells */
+  .cell.todo h2{color:var(--muted)}
+  .todo-card{border:1px dashed var(--rule); border-radius:12px; background:transparent;
+    padding:14px 16px; color:var(--muted); font-size:14.5px}
+  .todo-card .run{font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted)}
+  .todo-list{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-top:10px}
+  .todo-list div{background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 12px;
+    font-family:"IBM Plex Sans",sans-serif; font-size:14px; color:var(--ink-2)}
+  .todo-list span{display:block; font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--muted); margin-top:3px}
+
+  footer.foot{margin:40px 0 60px; padding-top:18px; border-top:1px solid var(--line);
+    font-family:"IBM Plex Mono",monospace; font-size:12px; color:var(--muted);
+    display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  a{color:var(--accent)}
+  @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeBtn" aria-label="Theme wechseln">◐ theme</button>
+
+<div class="wrap">
+  <header class="mast">
+    <div class="kicker"><span class="dot"></span> Signal-Notizbuch · Fourier <span class="dot"></span> wächst Zelle für Zelle</div>
+    <h1>Wie man ein Signal in seine <span class="em">Töne</span> zerlegt</h1>
+    <p class="dek">Ein Poster, das wie ein Notebook wächst. Jede Kurve unten ist nicht gezeichnet, sondern
+      aus der Formel <em>gerechnet</em> — dasselbe Signal, das im Artikel „The Recording" heißt.</p>
+    <div class="mast-meta">
+      <span>Quelle: <code>How The FFT Actually Works</code></span>
+      <span>Signal: <code>2 Hz · 5 Hz · 9 Hz</code></span>
+      <span>N = <code>1000</code>, Dauer <code>1,0 s</code></span>
+    </div>
+  </header>
+
+  <!-- CELL 1: three knobs -->
+  <section class="cell" data-n="[1]">
+    <p class="out">In [1] · Die Bausteine</p>
+    <h2>Drei Regler, und das ist das ganze Vokabular</h2>
+    <p class="lead">Jede reine Zutat ist eine Sinuswelle mit genau drei Einstellungen. Dreh an einer
+      und sieh live, was passiert — die Kurve wird neu gerechnet, nicht neu gezeichnet.</p>
+    <figure class="panel">
+      <div id="knobChart"></div>
+      <div class="controls">
+        <label>Amplitude <input id="kAmp" type="range" min="0.2" max="1.4" step="0.05" value="1.0"></label>
+        <label>Frequenz <input id="kFreq" type="range" min="1" max="9" step="1" value="3"></label>
+        <label>Phase <input id="kPhase" type="range" min="0" max="6.28" step="0.05" value="0"></label>
+      </div>
+      <div class="knobs">
+        <div class="knob"><b>Amplitude</b><span id="kAmpV">1.00</span> · Höhe / Lautstärke</div>
+        <div class="knob"><b>Frequenz</b><span id="kFreqV">3</span> Hz · Tempo</div>
+        <div class="knob"><b>Phase</b><span id="kPhaseV">0.00</span> rad · Timing / „wie spät gestartet"</div>
+      </div>
+      <figcaption>Anfänger drehen nur an zwei Reglern und wundern sich, warum der wieder­aufgebaute
+        Klang wie ein umfallender Aktenschrank klingt. Der dritte ist die Phase.</figcaption>
+    </figure>
+  </section>
+
+  <!-- CELL 2: three components -->
+  <section class="cell" data-n="[2]">
+    <p class="out">In [2] · Die Zutaten</p>
+    <h2>Drei langweilige Wellen</h2>
+    <div class="formula">x(t) =
+      <span class="c2">1.00·sin(2π·2·t)</span> +
+      <span class="c5">0.60·sin(2π·5·t + 1.0)</span> +
+      <span class="c9">0.35·sin(2π·9·t + 2.0)</span></div>
+    <p class="lead">Genau das Beispiel aus dem Artikel und deinem Dialog: drei Komponenten, jede mit
+      Amplitude, Frequenz und Phase. Jede hier als echte Kurve über eine Sekunde.</p>
+    <div class="grid3">
+      <figure class="panel"><div id="comp0"></div><figcaption><b style="color:var(--c2)">2 Hz</b> · A=1.00, φ=0</figcaption></figure>
+      <figure class="panel"><div id="comp1"></div><figcaption><b style="color:var(--c5)">5 Hz</b> · A=0.60, φ=1.0</figcaption></figure>
+      <figure class="panel"><div id="comp2"></div><figcaption><b style="color:var(--c9)">9 Hz</b> · A=0.35, φ=2.0</figcaption></figure>
+    </div>
+  </section>
+
+  <!-- CELL 3: the sum -->
+  <section class="cell" data-n="[3]">
+    <p class="out">In [3] · Addieren ist leicht</p>
+    <h2>Die Aufnahme — „the scary wave"</h2>
+    <p class="lead">Leg die drei übereinander und du bekommst das, was ein Mikrofon wirklich aufzeichnet:
+      eine einzige wacklige Linie. Addieren ist leicht. Das <em>Ent</em>-Addieren ist der Grund, warum
+      es dieses ganze Feld gibt.</p>
+    <figure class="panel">
+      <div id="sumChart"></div>
+      <figcaption>Dieselben drei Kurven von oben, punktweise summiert (N = 1000 Samples).
+        Kannst du 2, 5 und 9 Hz darin noch sehen? Niemand kann das — deshalb der nächste Schritt.</figcaption>
+    </figure>
+  </section>
+
+  <!-- CELL 4: the rhyme test -->
+  <section class="cell" data-n="[4]">
+    <p class="out">In [4] · Die Sortiermaschine</p>
+    <h2>„Does it rhyme?" — multiplizieren und aufsummieren</h2>
+    <p class="lead">Frag: steckt <em>f</em> Hz drin? Bau eine saubere Testwelle mit <em>f</em> Hz, multipliziere
+      Punkt für Punkt mit dem Signal, summiere alles auf. Reimt es sich, sammelt die Summe Punkte.
+      Reimt es sich nicht, heben sich Plus und Minus weg. Zieh am Regler.</p>
+    <figure class="panel">
+      <div class="controls">
+        <label>Test­frequenz <b id="tfV" style="color:var(--accent)">5</b> Hz
+          <input id="tf" type="range" min="1" max="12" step="1" value="5"></label>
+        <span class="chips">
+          <button class="chip" data-f="2">2 Hz</button>
+          <button class="chip" data-f="3">3 Hz</button>
+          <button class="chip" data-f="5">5 Hz</button>
+          <button class="chip" data-f="7">7 Hz</button>
+          <button class="chip" data-f="9">9 Hz</button>
+        </span>
+      </div>
+      <div id="prodChart"></div>
+      <div class="scorebox">
+        <div class="score"><small>Score = |Σ Signal × Welle| · 2/N</small>
+          <span class="big" id="scoreV">0.60</span></div>
+        <div class="verdict out" id="verdict">nicht drin</div>
+      </div>
+      <figcaption>Die schraffierte Fläche ist das Produkt Signal × Sinuswelle. Liegt sie im Schnitt
+        <em>über</em> der Null­linie, sammelt die Laufsumme (weiße Linie) Höhe. Der Score nimmt zusätzlich
+        die Kosinus-Welle mit — dadurch ist er <em>immun gegen das Timing</em>: eine um 90° verschobene
+        5-Hz-Welle würde sonst fälschlich Null ergeben.</figcaption>
+    </figure>
+    <aside class="note"><b>Aus deinem Dialog:</b> Andere Frequenzen machen das Ergebnis an einzelnen
+      Punkten unordentlich — aber sie haben keine Ausdauer. Nur die wirklich vorhandene Frequenz treibt
+      die Summe kontinuierlich in eine Richtung; das Rauschen der anderen mittelt sich weg.</aside>
+  </section>
+
+  <!-- CELL 5: spectrum -->
+  <section class="cell" data-n="[5]">
+    <p class="out">In [5] · Das Ergebnis</p>
+    <h2>Das Spektrum — jede Frequenz einmal getestet</h2>
+    <p class="lead">Mach den Test für jede Frequenz und schreib die Scores nebeneinander. Das ist eine
+      echte DFT, hier im Browser über alle 1000 Samples gerechnet. Drei Balken ragen heraus —
+      exakt bei 2, 5 und 9 Hz, mit Höhen 1.00, 0.60 und 0.35. Die Maschine hat das Rezept gefunden.</p>
+    <figure class="panel">
+      <div id="specChart"></div>
+      <figcaption>Balken = <code>|X(f)|·2/N</code> aus der diskreten Fourier-Transformation. Jeder „Bin"
+        ist 1 Hz breit (Sample­rate 1000 ÷ N 1000). Bins sind keine Hertz — das ist die häufigste
+        Fehlerquelle, kommt in einer späteren Zelle.</figcaption>
+    </figure>
+  </section>
+
+  <!-- CELL 6: growing -->
+  <section class="cell todo" data-n="[ ]">
+    <p class="out">In [ ] · Noch nicht ausgeführt</p>
+    <h2>Das Notebook wächst weiter</h2>
+    <div class="todo-card">
+      <span class="run">▶ run next</span> — diese Zellen bauen wir Schritt für Schritt aus, jede mit
+      echten Kurven:
+      <div class="todo-list">
+        <div>Aliasing / Nyquist<span>900 Hz tarnt sich als 100 Hz</span></div>
+        <div>Windowing<span>np.hanning gegen den Klippen-Effekt</span></div>
+        <div>Warum „schnell"?<span>N² vs. N·log N</span></div>
+        <div>Spektrogramm<span>Zeit × Tonhöhe × Lautheit</span></div>
+        <div>Phase & drehender Pfeil<span>e^(−i2πkn/N), Euler</span></div>
+        <div>Anwendungen<span>Shazam, MRT, JPEG, Netzbrummen</span></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>Fourier-Notizbuch · v1 · gerechnet, nicht gezeichnet</span>
+    <span>Signal: 1.0·sin(2π2t) + 0.6·sin(2π5t+1) + 0.35·sin(2π9t+2)</span>
+  </footer>
+</div>
+
+<script>
+/* ============================================================
+   Alles unten rechnet echte Kurven aus dem Signal.
+   ============================================================ */
+const TAU = Math.PI*2;
+const SR = 1000, DUR = 1.0, N = Math.round(SR*DUR);
+const t = Array.from({length:N}, (_,n)=> n/SR);
+
+const COMPS = [
+  {f:2, A:1.00, ph:0.0, c:'var(--c2)'},
+  {f:5, A:0.60, ph:1.0, c:'var(--c5)'},
+  {f:9, A:0.35, ph:2.0, c:'var(--c9)'},
+];
+const comp = (f,A,ph)=> t.map(ti => A*Math.sin(TAU*f*ti + ph));
+const signal = (()=>{ const s=new Array(N).fill(0);
+  COMPS.forEach(({f,A,ph})=>{ for(let n=0;n<N;n++) s[n]+= A*Math.sin(TAU*f*t[n]+ph); });
+  return s; })();
+
+/* ---------- tiny SVG plotter (real data -> path) ---------- */
+function cssColor(v){ // resolve a var() to a concrete color for fills that need it
+  if(!v.startsWith('var(')) return v;
+  const name=v.slice(4,-1).trim();
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||v;
+}
+function plot(mount, opts){
+  const W=1000, H=opts.h||300;
+  const m={l:46,r:opts.mr??18,t:16,b:(opts.b??34)+(opts.xLabel?18:0)};
+  const pw=W-m.l-m.r, ph=H-m.t-m.b;
+  const xd=opts.xDomain, yd=opts.yDomain;
+  const X=x=> m.l + (x-xd[0])/(xd[1]-xd[0])*pw;
+  const Y=y=> m.t + (yd[1]-y)/(yd[1]-yd[0])*ph;
+  let s=`<svg class="chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${opts.aria||''}">`;
+  // horizontal grid + y labels
+  (opts.yTicks||[]).forEach(v=>{
+    const y=Y(v);
+    s+=`<line class="${v===0?'zero':'grid'}" x1="${m.l}" y1="${y}" x2="${W-m.r}" y2="${y}"/>`;
+    s+=`<text x="${m.l-8}" y="${y+4}" text-anchor="end" font-size="13">${opts.yFmt?opts.yFmt(v):v}</text>`;
+  });
+  // x ticks
+  (opts.xTicks||[]).forEach(v=>{
+    const x=X(v);
+    if(opts.xGrid) s+=`<line class="grid" x1="${x}" y1="${m.t}" x2="${x}" y2="${H-m.b}"/>`;
+    s+=`<text x="${x}" y="${H-m.b+22}" text-anchor="middle" font-size="13">${opts.xFmt?opts.xFmt(v):v}</text>`;
+  });
+  if(opts.xLabel) s+=`<text x="${m.l+pw/2}" y="${H-4}" text-anchor="middle" font-size="12.5">${opts.xLabel}</text>`;
+  // areas (shaded) first
+  (opts.areas||[]).forEach(a=>{
+    const col=cssColor(a.fill);
+    let d=`M ${X(a.data[0][0]).toFixed(1)} ${Y(0).toFixed(1)}`;
+    a.data.forEach(([x,y])=> d+=` L ${X(x).toFixed(1)} ${Y(y).toFixed(1)}`);
+    d+=` L ${X(a.data[a.data.length-1][0]).toFixed(1)} ${Y(0).toFixed(1)} Z`;
+    s+=`<path d="${d}" fill="${col}" stroke="none"/>`;
+  });
+  // series
+  (opts.series||[]).forEach(se=>{
+    const col=cssColor(se.color);
+    let d='M';
+    se.data.forEach(([x,y],i)=> d+=`${i?' L':''} ${X(x).toFixed(1)} ${Y(y).toFixed(1)}`);
+    s+=`<path class="cwave" d="${d}" stroke="${col}" style="stroke-width:${se.w||2.4};${se.dash?`stroke-dasharray:${se.dash}`:''}"/>`;
+    if(se.label){ const lx=se.data[se.labelAt??Math.floor(se.data.length*0.02)];
+      s+=`<text class="lbl" x="${X(lx[0])+6}" y="${Y(lx[1])-8}" fill="${col}">${se.label}</text>`; }
+  });
+  // bars
+  (opts.bars||[]).forEach(b=>{
+    const x=X(b.x), y=Y(b.y), y0=Y(0), bw=opts.barW||10;
+    const col=cssColor(b.color||'var(--accent)');
+    s+=`<rect x="${(x-bw/2).toFixed(1)}" y="${Math.min(y,y0).toFixed(1)}" width="${bw}" height="${Math.abs(y0-y).toFixed(1)}" rx="3" fill="${col}"/>`;
+    if(b.label) s+=`<text x="${x}" y="${y-8}" text-anchor="middle" font-size="13" fill="${col}" style="font-weight:600">${b.label}</text>`;
+  });
+  s+='</svg>';
+  (typeof mount==='string'?document.getElementById(mount):mount).innerHTML=s;
+}
+const dec = (arr,step)=> arr.filter((_,i)=> i%step===0); // decimate for path density
+const zip = (ys)=> t.map((ti,i)=>[ti,ys[i]]);
+
+/* ---------- CELL 1: knobs ---------- */
+const kAmp=document.getElementById('kAmp'), kFreq=document.getElementById('kFreq'), kPhase=document.getElementById('kPhase');
+function drawKnob(){
+  const A=+kAmp.value, f=+kFreq.value, ph=+kPhase.value;
+  document.getElementById('kAmpV').textContent=A.toFixed(2);
+  document.getElementById('kFreqV').textContent=f;
+  document.getElementById('kPhaseV').textContent=ph.toFixed(2);
+  const y=comp(f,A,ph);
+  plot('knobChart',{h:260, xDomain:[0,1], yDomain:[-1.5,1.5],
+    yTicks:[-1,0,1], xTicks:[0,0.25,0.5,0.75,1], xFmt:v=>v.toFixed(2)+'s',
+    aria:'Eine Sinuswelle mit einstellbarer Amplitude, Frequenz, Phase',
+    series:[{data:dec(zip(y),2), color:'var(--accent)', w:2.6}]});
+}
+[kAmp,kFreq,kPhase].forEach(el=>el.addEventListener('input',drawKnob));
+
+/* ---------- CELL 2: components ---------- */
+function drawComps(){
+  COMPS.forEach((c,i)=>{
+    const y=comp(c.f,c.A,c.ph);
+    plot('comp'+i,{h:190, mr:14, b:30, xDomain:[0,1], yDomain:[-1.1,1.1],
+      yTicks:[-1,0,1], xTicks:[0,0.5,1], xFmt:v=>v.toFixed(1),
+      aria:c.f+' Hz Komponente',
+      series:[{data:dec(zip(y),2), color:c.c, w:2.4}]});
+  });
+}
+
+/* ---------- CELL 3: sum ---------- */
+function drawSum(){
+  plot('sumChart',{h:300, xDomain:[0,1], yDomain:[-2,2],
+    yTicks:[-2,-1,0,1,2], xTicks:[0,0.25,0.5,0.75,1], xFmt:v=>v.toFixed(2)+'s', xGrid:false,
+    aria:'Summe der drei Komponenten, die Aufnahme',
+    series:[{data:dec(zip(signal),1), color:'var(--sum)', w:2.2, label:'x(t)', labelAt:8}]});
+}
+
+/* ---------- CELL 4: rhyme test ---------- */
+const tf=document.getElementById('tf');
+function drawTest(){
+  const f=+tf.value;
+  document.getElementById('tfV').textContent=f;
+  // product with sine test wave (visual), running sum (visual)
+  const prod=new Array(N), run=new Array(N); let acc=0;
+  for(let n=0;n<N;n++){ prod[n]=signal[n]*Math.sin(TAU*f*t[n]); acc+=prod[n]; run[n]=acc; }
+  // phase-immune score via sin+cos
+  let re=0, im=0;
+  for(let n=0;n<N;n++){ re+=signal[n]*Math.cos(TAU*f*t[n]); im+=signal[n]*Math.sin(TAU*f*t[n]); }
+  const score=2/N*Math.hypot(re,im);
+  // running sum scaled into view (its final value ~ N/2*amp*cos-ish; scale to [-3,3] band by /N*2)
+  const runScaled=run.map((v,i)=>[t[i], v*2/N]);
+  document.getElementById('scoreV').textContent=score.toFixed(2);
+  const vEl=document.getElementById('verdict');
+  const isIn=score>0.15;
+  vEl.textContent=isIn?'ist drin ✓':'~ nicht drin';
+  vEl.className='verdict '+(isIn?'in':'out');
+  plot('prodChart',{h:320, xDomain:[0,1], yDomain:[-2.4,2.4],
+    yTicks:[-2,-1,0,1,2], xTicks:[0,0.25,0.5,0.75,1], xFmt:v=>v.toFixed(2)+'s',
+    aria:'Produkt von Signal und Testwelle plus Laufsumme',
+    areas:[{data:dec(zip(prod),1), fill:'var(--shade)'}],
+    series:[
+      {data:dec(zip(prod),1), color:'var(--c5)', w:1.6, label:'Signal × Welle', labelAt:6},
+      {data:dec(runScaled,1), color:'var(--ink)', w:2.8, label:'Laufsumme', labelAt:520},
+    ]});
+}
+tf.addEventListener('input',drawTest);
+document.querySelectorAll('.chip').forEach(ch=>ch.addEventListener('click',()=>{ tf.value=ch.dataset.f; drawTest(); }));
+
+/* ---------- CELL 5: real DFT spectrum ---------- */
+function dftMag(maxHz){
+  const bars=[];
+  for(let k=0;k<=maxHz;k++){
+    let re=0, im=0;
+    for(let n=0;n<N;n++){ const a=-TAU*k*n/N; re+=signal[n]*Math.cos(a); im+=signal[n]*Math.sin(a); }
+    bars.push({x:k, y:2/N*Math.hypot(re,im)});
+  }
+  return bars;
+}
+function drawSpec(){
+  const maxHz=14;
+  const bars=dftMag(maxHz).map(b=>({...b,
+    color: b.x===2?'var(--c2)':b.x===5?'var(--c5)':b.x===9?'var(--c9)':'var(--rule)',
+    label:(Math.abs(b.y)>0.05)?b.y.toFixed(2):null}));
+  plot('specChart',{h:300, barW:16, xDomain:[-0.5,maxHz+0.5], yDomain:[0,1.15],
+    yTicks:[0,0.25,0.5,0.75,1.0], xTicks:Array.from({length:maxHz+1},(_,i)=>i), xFmt:v=>v,
+    xLabel:'Frequenz (Hz)', aria:'Amplitudenspektrum aus echter DFT',
+    bars});
+}
+
+/* ---------- init + theme ---------- */
+function drawAll(){ drawKnob(); drawComps(); drawSum(); drawTest(); drawSpec(); }
+drawAll();
+
+const btn=document.getElementById('themeBtn');
+function apply(mode){ if(mode) document.documentElement.setAttribute('data-theme',mode);
+  else document.documentElement.removeAttribute('data-theme');
+  drawAll(); }
+let stored=null; try{ stored=localStorage.getItem('fourier-theme'); }catch(e){}
+if(stored) apply(stored);
+btn.addEventListener('click',()=>{
+  const cur=document.documentElement.getAttribute('data-theme');
+  const prefDark=matchMedia('(prefers-color-scheme: dark)').matches;
+  const next = cur==='dark'?'light':cur==='light'?'dark':(prefDark?'light':'dark');
+  try{ localStorage.setItem('fourier-theme',next); }catch(e){}
+  apply(next);
+});
+</script>
+</body>
+</html>

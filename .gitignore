@@ -1,0 +1,5 @@
+tmp/
+.worktrees/
+.playwright-mcp/
+.DS_Store
+*.pdf
