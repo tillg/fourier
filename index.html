@@ -116,6 +116,14 @@
   .grid3{display:grid; grid-template-columns:repeat(3,1fr); gap:12px}
   @media(max-width:720px){.grid3{grid-template-columns:1fr}}
 
+  .compctl{margin-top:10px; display:flex; flex-direction:column; gap:5px;
+    border-top:1px dashed var(--line); padding-top:9px}
+  .compctl .row{display:grid; grid-template-columns:1.1em 1fr auto; gap:8px; align-items:center;
+    font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--ink-2)}
+  .compctl input[type=range]{width:100%; accent-color:var(--cc); min-width:0}
+  .compctl .v{color:var(--muted); text-align:right; min-width:44px; font-variant-numeric:tabular-nums}
+  .compctl-hint{font-family:"IBM Plex Mono",monospace; font-size:11px; color:var(--muted); margin-top:8px}
+
   /* rhyme test controls */
   .controls{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:12px 0 4px;
     font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--ink-2)}
@@ -198,17 +206,19 @@
   <section class="cell" data-n="[2]">
     <p class="out">In [2] · Die Zutaten</p>
     <h2>Drei langweilige Wellen</h2>
-    <div class="formula">x(t) =
-      <span class="c2">1.00·sin(2π·2·t)</span> +
-      <span class="c5">0.60·sin(2π·5·t + 1.0)</span> +
-      <span class="c9">0.35·sin(2π·9·t + 2.0)</span></div>
+    <div class="formula" id="formula">x(t) =
+      <span class="c2" id="f0"></span> +
+      <span class="c5" id="f1"></span> +
+      <span class="c9" id="f2"></span></div>
     <p class="lead">Genau das Beispiel aus dem Artikel und deinem Dialog: drei Komponenten, jede mit
-      Amplitude, Frequenz und Phase. Jede hier als echte Kurve über eine Sekunde.</p>
+      Amplitude, Frequenz und Phase. Dreh an den Reglern unter jeder Kurve — das Komponentenbild,
+      die Summe, der Test und das Spektrum rechnen sich sofort neu.</p>
     <div class="grid3">
-      <figure class="panel"><div id="comp0"></div><figcaption><b style="color:var(--c2)">2 Hz</b> · A=1.00, φ=0</figcaption></figure>
-      <figure class="panel"><div id="comp1"></div><figcaption><b style="color:var(--c5)">5 Hz</b> · A=0.60, φ=1.0</figcaption></figure>
-      <figure class="panel"><div id="comp2"></div><figcaption><b style="color:var(--c9)">9 Hz</b> · A=0.35, φ=2.0</figcaption></figure>
+      <figure class="panel"><div id="comp0"></div><figcaption id="cap0"></figcaption><div class="compctl" id="ctl0" style="--cc:var(--c2)"></div></figure>
+      <figure class="panel"><div id="comp1"></div><figcaption id="cap1"></figcaption><div class="compctl" id="ctl1" style="--cc:var(--c5)"></div></figure>
+      <figure class="panel"><div id="comp2"></div><figcaption id="cap2"></figcaption><div class="compctl" id="ctl2" style="--cc:var(--c9)"></div></figure>
     </div>
+    <div class="compctl-hint">Frequenz-Regler in ganzen Hertz (1–12), damit die Bins sauber treffen · <button class="chip" id="resetSig" style="margin-left:6px">↺ zurücksetzen</button></div>
   </section>
 
   <!-- CELL 3: the sum -->
@@ -312,10 +322,22 @@ const COMPS = [
   {f:5, A:0.60, ph:1.0, c:'var(--c5)'},
   {f:9, A:0.35, ph:2.0, c:'var(--c9)'},
 ];
+const COMP0 = COMPS.map(c=>({...c})); // defaults for reset
 const comp = (f,A,ph)=> t.map(ti => A*Math.sin(TAU*f*ti + ph));
-const signal = (()=>{ const s=new Array(N).fill(0);
-  COMPS.forEach(({f,A,ph})=>{ for(let n=0;n<N;n++) s[n]+= A*Math.sin(TAU*f*t[n]+ph); });
-  return s; })();
+const signal = new Array(N).fill(0);
+function rebuildSignal(){
+  for(let i=0;i<N;i++){ let v=0; for(const c of COMPS) v+= c.A*Math.sin(TAU*c.f*t[i]+c.ph); signal[i]=v; }
+}
+rebuildSignal();
+// symmetric, auto-scaled tick set around 0 so louder signals never clip
+function symTicks(max){
+  let m=Math.max(1,Math.ceil(max-1e-9));
+  let step = m<=2?1 : m<=6?2 : Math.ceil(m/3);
+  const ticks=[0];
+  for(let v=step; v<=m+1e-9; v+=step){ ticks.unshift(-v); ticks.push(v); }
+  return {m:ticks[ticks.length-1], ticks};
+}
+const amax = arr => arr.reduce((mx,v)=>Math.max(mx,Math.abs(v)),0);
 
 /* ---------- tiny SVG plotter (real data -> path) ---------- */
 function cssColor(v){ // resolve a var() to a concrete color for fills that need it
@@ -389,21 +411,63 @@ function drawKnob(){
 }
 [kAmp,kFreq,kPhase].forEach(el=>el.addEventListener('input',drawKnob));
 
-/* ---------- CELL 2: components ---------- */
-function drawComps(){
+/* ---------- CELL 2: components (editable) ---------- */
+function drawComps(only){
   COMPS.forEach((c,i)=>{
+    if(only!=null && only!==i) return;
     const y=comp(c.f,c.A,c.ph);
-    plot('comp'+i,{h:190, mr:14, b:30, xDomain:[0,1], yDomain:[-1.1,1.1],
-      yTicks:[-1,0,1], xTicks:[0,0.5,1], xFmt:v=>v.toFixed(1),
+    const {m,ticks}=symTicks(Math.max(1, c.A));
+    plot('comp'+i,{h:190, mr:14, b:30, xDomain:[0,1], yDomain:[-m,m],
+      yTicks:ticks, xTicks:[0,0.5,1], xFmt:v=>v.toFixed(1),
       aria:c.f+' Hz Komponente',
       series:[{data:dec(zip(y),2), color:c.c, w:2.4}]});
   });
 }
+const CC=['var(--c2)','var(--c5)','var(--c9)'];
+function updateFormula(){
+  COMPS.forEach((c,i)=>{
+    const ph = c.ph>0.001 ? ' + '+c.ph.toFixed(1) : '';
+    document.getElementById('f'+i).textContent = `${c.A.toFixed(2)}·sin(2π·${c.f}·t${ph})`;
+  });
+}
+function updateCaption(i){
+  const c=COMPS[i];
+  document.getElementById('cap'+i).innerHTML =
+    `<b style="color:${CC[i]}">${c.f} Hz</b> · A=${c.A.toFixed(2)}, φ=${c.ph.toFixed(2)}`;
+}
+function buildCtl(i){
+  const c=COMPS[i];
+  document.getElementById('ctl'+i).innerHTML =
+    `<div class="row"><span>A</span><input type="range" min="0" max="1.4" step="0.05" value="${c.A}" data-i="${i}" data-k="A"><span class="v" id="v${i}A">${c.A.toFixed(2)}</span></div>`+
+    `<div class="row"><span>f</span><input type="range" min="1" max="12" step="1" value="${c.f}" data-i="${i}" data-k="f"><span class="v" id="v${i}f">${c.f} Hz</span></div>`+
+    `<div class="row"><span>φ</span><input type="range" min="0" max="6.28" step="0.05" value="${c.ph}" data-i="${i}" data-k="ph"><span class="v" id="v${i}ph">${c.ph.toFixed(2)}</span></div>`;
+}
+function onCtlInput(inp){
+  const i=+inp.dataset.i, k=inp.dataset.k, val=+inp.value;
+  COMPS[i][k]=val;
+  document.getElementById('v'+i+k).textContent = k==='f' ? val+' Hz' : val.toFixed(2);
+  rebuildSignal();
+  drawComps(i); drawSum(); drawTest(); drawSpec(); updateFormula(); updateCaption(i);
+}
+function wireCtls(){
+  document.querySelectorAll('.compctl input').forEach(inp=>
+    inp.addEventListener('input',()=>onCtlInput(inp)));
+}
+function initComps(){
+  for(let i=0;i<3;i++){ buildCtl(i); updateCaption(i); }
+  wireCtls(); updateFormula();
+}
+document.getElementById('resetSig').addEventListener('click',()=>{
+  COMPS.forEach((c,i)=>{ c.A=COMP0[i].A; c.f=COMP0[i].f; c.ph=COMP0[i].ph; buildCtl(i); updateCaption(i); });
+  wireCtls(); rebuildSignal();
+  drawComps(); drawSum(); drawTest(); drawSpec(); updateFormula();
+});
 
 /* ---------- CELL 3: sum ---------- */
 function drawSum(){
-  plot('sumChart',{h:300, xDomain:[0,1], yDomain:[-2,2],
-    yTicks:[-2,-1,0,1,2], xTicks:[0,0.25,0.5,0.75,1], xFmt:v=>v.toFixed(2)+'s', xGrid:false,
+  const {m,ticks}=symTicks(amax(signal));
+  plot('sumChart',{h:300, xDomain:[0,1], yDomain:[-m,m],
+    yTicks:ticks, xTicks:[0,0.25,0.5,0.75,1], xFmt:v=>v.toFixed(2)+'s', xGrid:false,
     aria:'Summe der drei Komponenten, die Aufnahme',
     series:[{data:dec(zip(signal),1), color:'var(--sum)', w:2.2, label:'x(t)', labelAt:8}]});
 }
@@ -427,8 +491,9 @@ function drawTest(){
   const isIn=score>0.15;
   vEl.textContent=isIn?'ist drin ✓':'~ nicht drin';
   vEl.className='verdict '+(isIn?'in':'out');
-  plot('prodChart',{h:320, xDomain:[0,1], yDomain:[-2.4,2.4],
-    yTicks:[-2,-1,0,1,2], xTicks:[0,0.25,0.5,0.75,1], xFmt:v=>v.toFixed(2)+'s',
+  const {m,ticks}=symTicks(Math.max(amax(prod), amax(runScaled.map(p=>p[1]))));
+  plot('prodChart',{h:320, xDomain:[0,1], yDomain:[-m,m],
+    yTicks:ticks, xTicks:[0,0.25,0.5,0.75,1], xFmt:v=>v.toFixed(2)+'s',
     aria:'Produkt von Signal und Testwelle plus Laufsumme',
     areas:[{data:dec(zip(prod),1), fill:'var(--shade)'}],
     series:[
@@ -451,8 +516,9 @@ function dftMag(maxHz){
 }
 function drawSpec(){
   const maxHz=14;
+  const fcol={}; COMPS.forEach((c,i)=>{ fcol[c.f]=CC[i]; }); // colour bins at current component freqs
   const bars=dftMag(maxHz).map(b=>({...b,
-    color: b.x===2?'var(--c2)':b.x===5?'var(--c5)':b.x===9?'var(--c9)':'var(--rule)',
+    color: fcol[b.x]||'var(--rule)',
     label:(Math.abs(b.y)>0.05)?b.y.toFixed(2):null}));
   plot('specChart',{h:300, barW:16, xDomain:[-0.5,maxHz+0.5], yDomain:[0,1.15],
     yTicks:[0,0.25,0.5,0.75,1.0], xTicks:Array.from({length:maxHz+1},(_,i)=>i), xFmt:v=>v,
@@ -462,6 +528,7 @@ function drawSpec(){
 
 /* ---------- init + theme ---------- */
 function drawAll(){ drawKnob(); drawComps(); drawSum(); drawTest(); drawSpec(); }
+initComps();
 drawAll();
 
 const btn=document.getElementById('themeBtn');
