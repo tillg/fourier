@@ -11,7 +11,9 @@ Medium-Artikel *„How The Fast Fourier Transform Actually Works"* und der begle
 
 ![Fourier-Poster v1](assets/poster-preview.png)
 
-> Interaktiv: `index.html` lokal öffnen (Regler & Testfrequenz sind live). Dark/Light per Umschalter oben rechts.
+> **Interaktiv (live, gerendert):** https://claude.ai/code/artifact/877d1135-2b0c-487a-87db-3b38f9498e85
+> — Regler & Testfrequenz sind bedienbar, Dark/Light per Umschalter oben rechts.
+> Alternativ `index.html` lokal öffnen.
 
 ## Das Signal
 
